@@ -52,7 +52,6 @@ variables:
   person: !input person
   zone: !input zone
   home_occupied: !input home_occupied
-  anyone_in_zone: "{{ expand(person) | selectattr('state', 'eq', zone) | list | count > 0 }}"
 
 condition:
 
@@ -68,19 +67,9 @@ action:
           - condition: trigger
             id: enter
         sequence: #check if anyone is in zone
-          - if:
-              - condition: not
-                conditions:
-                  - condition: not
-                    conditions:
-                      - condition: zone
-                        entity_id: !input person
-                        zone: !input zone
-            then:
-              - service: input_boolean.turn_on
-                target:
-                  entity_id: input_boolean.home_occupied
-                data: {}
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.home_occupied
       - conditions:
           - condition: trigger
             id: leave
