@@ -287,6 +287,46 @@ action:
                             - service: climate.turn_off
                               target:
                                   entity_id: !input thermostat
+                - conditions: #central-on
+                      - condition: trigger
+                        id: central-on
+                  sequence:
+                      - if:
+                            - condition: state
+                              entity_id: !input home_occupied
+                              state: 'off'
+                            - condition: state
+                              entity_id: !input schedule
+                              state: 'on'
+                        then:
+                            - service: climate.set_temperature
+                              target:
+                                  entity_id: !input thermostat
+                              data:
+                                  temperature: !input comfort_temperature
+                                  hvac_mode: heat
+                      - if:
+                            - condition: state
+                              entity_id: !input home_occupied
+                              state: 'off'
+                            - condition: state
+                              entity_id: !input schedule
+                              state: 'on'
+                        then:
+                            - service: climate.set_temperature
+                              target:
+                                  entity_id: !input thermostat
+                              data:
+                                  temperature: !input away_temperature
+                                  hvac_mode: heat
+                      - if:
+                            - condition: state
+                              entity_id: !input schedule
+                              state: 'off'
+                        then:
+                            - service: climate.turn_off
+                              target:
+                                  entity_id: !input thermostat
     - if:
           - condition: trigger
             id: central-off
