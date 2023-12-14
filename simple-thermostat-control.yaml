@@ -148,50 +148,10 @@ action:
       - conditions:
           - condition: trigger
             id: central-off
-            sequence:
-              - service: climate.turn_off
-                target:
-                  entity_id: !input thermostat
-      - conditions:
-          - condition: trigger
-            id: central-on
         sequence:
-          - if:
-              - condition: state
-                entity_id: !input home_occupied
-                state: "on"
-              - condition: state
-                entity_id: !input schedule
-                state: "on"
-            then:
-              - service: climate.set_temperature
-                target:
-                  entity_id: !input thermostat
-                data:
-                  temperature: "{{ states[comfort_temperature].state | float }}"
-                  hvac_mode: heat
-          - if:
-              - condition: state
-                entity_id: !input home_occupied
-                state: "off"
-              - condition: state
-                entity_id: !input schedule
-                state: "on"
-            then:
-              - service: climate.set_temperature
-                target:
-                  entity_id: !input thermostat
-                data:
-                  temperature: "{{ states[away_temperature].state | float }}"
-                  hvac_mode: heat
-          - if:
-              - condition: state
-                entity_id: !input schedule
-                state: "off"
-            then:
-              - service: climate.turn_off
-                target:
-                  entity_id: !input thermostat
+          - service: climate.turn_off
+            target:
+              entity_id: !input thermostat
       - conditions:
           - condition: trigger
             id: schedule-on
@@ -286,6 +246,46 @@ action:
       - conditions:
           - condition: trigger
             id: automation-reloaded
+        sequence:
+          - if:
+              - condition: state
+                entity_id: !input home_occupied
+                state: "on"
+              - condition: state
+                entity_id: !input schedule
+                state: "on"
+            then:
+              - service: climate.set_temperature
+                target:
+                  entity_id: !input thermostat
+                data:
+                  temperature: "{{ states[comfort_temperature].state | float }}"
+                  hvac_mode: heat
+          - if:
+              - condition: state
+                entity_id: !input home_occupied
+                state: "off"
+              - condition: state
+                entity_id: !input schedule
+                state: "on"
+            then:
+              - service: climate.set_temperature
+                target:
+                  entity_id: !input thermostat
+                data:
+                  temperature: "{{ states[away_temperature].state | float }}"
+                  hvac_mode: heat
+          - if:
+              - condition: state
+                entity_id: !input schedule
+                state: "off"
+            then:
+              - service: climate.turn_off
+                target:
+                  entity_id: !input thermostat
+      - conditions:
+          - condition: trigger
+            id: central-on
         sequence:
           - if:
               - condition: state
