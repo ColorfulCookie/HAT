@@ -139,14 +139,14 @@ action:
             id: hat-start
       then:
           - delay:
-                seconds: 30
+            seconds: 30
+    - variables:
+      comfort_temperature: !input comfort_temperature
+      away_temperature: !input away_temperature
     - if:
           - condition: trigger
             id: central-on
       then:
-          - variables:
-            comfort_temperature: !input comfort_temperature
-            away_temperature: !input away_temperature
           - choose:
                 - conditions:
                       - condition: trigger #schedule turns on: check if person(s) are at home, if so turn on to comfort temperature, if not turn on away temperature
