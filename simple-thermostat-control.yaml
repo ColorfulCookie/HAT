@@ -1,0 +1,296 @@
+blueprint:
+    name: Simple Thermostat Control
+    author: Colorful Cookie
+    description: Simple thermostat control based on position and time.
+    domain: automation
+    input:
+        thermostat:
+            name: Thermostat
+            description: This is the thermostats to be controlled.
+            selector:
+                entity:
+                    filter:
+                        - domain:
+                              - climate
+                    multiple: true
+        schedule:
+            name: Schedule
+            description: Scheduler that specifies when the comfort temperature will be set.
+            default:
+            selector:
+                entity:
+                    filter:
+                        - domain:
+                              - schedule
+                    multiple: false
+        comfort_temperature:
+            name: Comfort Temperature
+            description: Input number helper to set the comfort temperature.
+            default:
+            selector:
+                entity:
+                    filter:
+                        - domain:
+                              - input_number
+                    multiple: false
+        away_temperature:
+            name: Away Temperature
+            description: Input number helper to set the away temperature.
+            default:
+            selector:
+                entity:
+                    filter:
+                        - domain:
+                              - input_number
+                    multiple: false
+        person:
+            name: Person
+            description: The is the persons who's location is going to be used for the control
+            selector:
+                entity:
+                    filter:
+                        - domain:
+                              - person
+                    multiple: true
+        home_occupied:
+            name: Input Boolean Home Occupied
+            description: An input boolean that changes its state based on the occupation of your home
+            selector:
+                entity:
+                    filter:
+                        - domain:
+                              - input_boolean
+                    multiple: false
+        zone:
+            name: Zone
+            description: This zone will be used together with the persons to decide weather a thermostat should be on or off.
+            selector:
+                entity:
+                    filter:
+                        - domain:
+                              - zone
+                    multiple: false
+        on_off:
+            name: On & Off boolean
+            description: Input boolean for enabling/disabling ths automation.
+            selector:
+                entity:
+                    filter:
+                        - domain:
+                              - input_boolean
+                    multiple: false
+
+trigger:
+    - platform: homeassistant
+      event: start
+      id: hat-start
+    - platform: event
+      event_type: automation_reloaded
+      id: automation-reloaded
+    - platform: state
+      entity_id: !input schedule
+      to: 'on'
+      id: schedule-on
+    - platform: state
+      entity_id: !input schedule
+      to: 'off'
+      id: schedule-off
+    - platform: zone
+      entity_id: !input person
+      zone: !input zone
+      event: enter
+      id: person-enter
+    - platform: zone
+      entity_id: !input person
+      zone: !input zone
+      event: leave
+      id: person-leave
+    - platform: state
+      entity_id: !input on_off
+      to: 'on'
+      id: central-on
+    - platform: state
+      entity_id: !input on_off
+      to: 'off'
+      id: central-off
+    - platform: numeric_state
+      entity_id: !input comfort_temperature
+      above: 0
+      id: comfort-temperature-update
+    - platform: numeric_state
+      entity_id: !input away_temperature
+      above: 0
+      id: away-temperature-update
+    # - platform: template
+    #   value_template:
+    #     "{% if trigger_comfort_temperature != none %}\n  {{ as_timestamp(now())
+    #     - as_timestamp(states.input_number[trigger_comfort_temperature.split('.')[1]].last_updated)
+    #     >= 2 }}\n{% else %}\n  {{ false }}\n{% endif %}\n"
+    #   id: comfort-temperature-update
+    # - platform: template
+    #   value_template: "{% if trigger_away_temperature != none %}\n  {{ as_timestamp(now())
+    #     - as_timestamp(states.input_number[trigger_away_temperature.split('.')[1]].last_updated)
+    #     >= 2 }}\n{% else %}\n  {{ false }}\n{% endif %}\n"
+    #   id: away-temperature-update
+
+variables:
+    thermostat: !input thermostat
+    schedule: !input schedule
+    comfort_temperature: !input comfort_temperature
+    away_temperature: !input away_temperature
+    person: !input person
+    zone: !input zone
+    on_off: !input on_off
+
+condition:
+
+action:
+    - if:
+          - condition: trigger
+            id: hat-start
+      then:
+          - delay:
+                seconds: 30
+    - if:
+          - condition: trigger
+            id: central-on
+      then:
+          - choose:
+                - conditions:
+                      - condition: trigger #schedule turns on: check if person(s) are at home, if so turn on to comfort temperature, if not turn on away temperature
+                        id: schedule-on
+                  sequence:
+                      - if:
+                            - condition: state
+                              entity_id: !input home_occupied
+                              state: 'off'
+                        then:
+                            - service: climate.set_temperature
+                              target:
+                                  entity_id: !input thermostat
+                              data:
+                                  temperature: !input comfort_temperature
+                                  hvac_mode: heat
+                      - if:
+                            - condition: state
+                              entity_id: !input home_occupied
+                              state: 'off'
+                        then:
+                      - service: climate.set_temperature
+                        target:
+                            entity_id: !input thermostat
+                        data:
+                            temperature: !input away_temperature
+                            hvac_mode: heat
+                - conditions:
+                      - condition: trigger #schedule turns off: set climate to off
+                        id: schedule-off
+                  sequence:
+                      - service: climate.turn_off
+                        target:
+                            entity_id: !input thermostat
+                - conditions:
+                      - condition: trigger #person enters: if inside schedule, set climate to comfort temperature
+                        id: person-enter
+                      - condition: state
+                        entity_id: !input schedule
+                        state: 'on'
+                  sequence:
+                      - service: climate.set_temperature
+                        target:
+                            entity_id: !input thermostat
+                        data:
+                            temperature: !input comfort_temperature
+                            hvac_mode: heat
+                - conditions:
+                      - condition: trigger #person leaves: check if anyone else it home; if not: set climate to away temperature
+                        id: person-leave
+                      - condition: state
+                        entity_id: !input home_occupied
+                        state: 'off'
+                  sequence:
+                      - service: climate.set_temperature
+                        target:
+                            entity_id: !input thermostat
+                        data:
+                            temperature: !input away_temperature
+                            hvac_mode: heat
+                - conditions:
+                      - condition: trigger #comfort temperature gets updated: check if anyone is home and schedule is on; if so set to new temperature
+                        id: comfort-temperature-update
+                      - condition: state
+                        entity_id: !input home_occupied
+                        state: 'off'
+                      - condition: state
+                        entity_id: !input schedule
+                        state: 'on'
+                  sequence:
+                      - service: climate.set_temperature
+                        target:
+                            entity_id: !input thermostat
+                        data:
+                            temperature: !input comfort_temperature
+                            hvac_mode: heat
+                - conditions:
+                      - condition: trigger #away temperature gets updated: check if noone is home and schedule is off; if so set to new temperature
+                        id: away-temperature-update
+                      - condition: state
+                        entity_id: !input home_occupied
+                        state: 'off'
+                      - condition: state
+                        entity_id: !input schedule
+                        state: 'on'
+                  sequence:
+                      - service: climate.set_temperature
+                        target:
+                            entity_id: !input thermostat
+                        data:
+                            temperature: !input away_temperature
+                            hvac_mode: heat
+                - conditions: #on reload check and apply settings
+                      - condition: trigger
+                        id: automation-reloaded
+                  sequence:
+                      - if:
+                            - condition: state
+                              entity_id: !input home_occupied
+                              state: 'off'
+                            - condition: state
+                              entity_id: !input schedule
+                              state: 'on'
+                        then:
+                            - service: climate.set_temperature
+                              target:
+                                  entity_id: !input thermostat
+                              data:
+                                  temperature: !input comfort_temperature
+                                  hvac_mode: heat
+                      - if:
+                            - condition: state
+                              entity_id: !input home_occupied
+                              state: 'off'
+                            - condition: state
+                              entity_id: !input schedule
+                              state: 'on'
+                        then:
+                            - service: climate.set_temperature
+                              target:
+                                  entity_id: !input thermostat
+                              data:
+                                  temperature: !input away_temperature
+                                  hvac_mode: heat
+                      - if:
+                            - condition: state
+                              entity_id: !input schedule
+                              state: 'off'
+                        then:
+                            - service: climate.turn_off
+                              target:
+                                  entity_id: !input thermostat
+    - if:
+          - condition: trigger
+            id: central-off
+      then:
+          - service: climate.turn_off
+            target:
+                entity_id: !input thermostat
