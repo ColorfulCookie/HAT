@@ -1,0 +1,98 @@
+blueprint:
+  name: Zone Occupation
+  author: Colorful Cookie
+  description: Simple zone occupation boolean switcher automation
+  domain: automation
+  input:
+    person:
+      name: Person
+      description: The is the persons who's location is going to be used for the control.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - person
+          multiple: true
+    zone:
+      name: Zone
+      description: This zone will be used together with the persons to decide weather a thermostat should be on or off.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - zone
+          multiple: false
+    home_occupied:
+      name: Input Boolean Occupied
+      description: An input boolean that should changes its state based on the occupation of the zone from above.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - input_boolean
+          multiple: false
+trigger_variables:
+  person: !input person
+  zone: !input zone
+  home_occupied: !input home_occupied
+
+trigger:
+  - platform: zone
+    entity_id: !input person
+    zone: !input zone
+    event: enter
+    id: enter
+  - platform: zone
+    entity_id: !input person
+    zone: !input zone
+    event: leave
+    id: leave
+
+variables:
+  person: !input person
+  zone: !input zone
+  home_occupied: !input home_occupied
+  anyone_in_zone: "{{ expand(person) | selectattr('state', 'eq', zone) | list | count > 0 }}"
+
+condition:
+
+action:
+  - if:
+      - condition: trigger
+        id: hat-start
+    then:
+      - delay:
+          seconds: 30
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: enter
+        sequence: #check if anyone is in zone
+          - if:
+              - condition: not
+                conditions:
+                  - condition: not
+                    conditions:
+                      - condition: zone
+                        entity_id: !input person
+                        zone: !input zone
+            then:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.home_occupied
+                data: {}
+      - conditions:
+          - condition: trigger
+            id: leave
+        sequence:
+          - if: #check if noone is in zone
+              - condition: not
+                conditions:
+                  - condition: zone
+                    entity_id: !input person
+                    zone: !input zone
+            then:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.home_occupied
+                data: {}
