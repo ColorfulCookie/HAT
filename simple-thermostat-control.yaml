@@ -131,18 +131,19 @@ variables:
   away_temperature: !input away_temperature
   person: !input person
   zone_occupied: !input zone_occupied
-  zone_occupation: "{% if zone_occupied == 'none' or zone_occupied == none %}
-    {% if person in state_attr(zone, 'persons') %}
-    {% set tmp = 'on' %}
-    {% else %}
-    {% set tmp = 'off' %}
-    {% endif %}
-    {% else %}
-    {% set tmp = zone_occupied %}
-    {% endif %}
-    {{ tmp }}"
   zone: !input zone
   on_off: !input on_off
+  zone_occupation: "
+    {% if not(zone_occupied == 'none' or zone_occupied == none)%}
+    {% set tmp = zone_occupied %}
+    {% elif(zone_occupied == 'none' or zone_occupied == none) and (is_state_attr(zone, 'persons', person)) %}
+    {% set tmp = 'on' %}
+    {% elif(zone_occupied == 'none' or zone_occupied == none) and not (is_state_attr(zone, 'persons', person)) %}
+    {% set tmp = 'off' %}
+    {% else %}
+    {% set tmp = '3' %}
+    {% endif %}
+    {{ tmp }}"
 
 condition:
 action:
@@ -203,11 +204,24 @@ action:
             data:
               temperature: "{{ states[comfort_temperature].state | float }}"
               hvac_mode: heat
-      - conditions: #[4]person leaving trigger, home not occupied
+      - conditions: #[4]person entering trigger, schedule off
+          - condition: trigger
+            id: person-enter
+          - condition: state
+            entity_id: !input schedule
+            state: "off"
+        sequence:
+          - service: climate.turn_off
+            target:
+              entity_id: !input thermostat
+      - conditions: #[5]person leaving trigger, home not occupied, schedule on
           - condition: trigger
             id: person-leave
           - condition: template
             value_template: "{{ zone_occupation == 'off' }}"
+          - condition: state
+            entity_id: !input schedule
+            state: "on"
         sequence:
           - service: climate.set_temperature
             target:
@@ -215,145 +229,94 @@ action:
             data:
               temperature: "{{ states[away_temperature].state | float }}"
               hvac_mode: heat
-      - conditions: #[5]comfort temperature updated
+      - conditions: #[6]person leaving trigger, home occupied, schedule on
           - condition: trigger
-            id: comfort-temperature-update
+            id: person-leave
+          - condition: template
+            value_template: "{{ zone_occupation == 'on' }}"
+          - condition: state
+            entity_id: !input schedule
+            state: "on"
         sequence:
-          - service: automation.reload
-      - conditions: #[6]away temperature updated
+          - service: climate.set_temperature
+            target:
+              entity_id: !input thermostat
+            data:
+              temperature: "{{ states[comfort_temperature].state | float }}"
+              hvac_mode: heat
+      - conditions: #[7]person leaving trigger, schedule off
           - condition: trigger
-            id: away-temperature-update
+            id: person-leave
+          - condition: state
+            entity_id: !input schedule
+            state: "off"
         sequence:
-          - service: automation.reload
-      - conditions: #[7]automation reloaded
-          - condition: trigger
-            id: automation-reloaded
-        sequence:
-          - if: #schedule off
-              - condition: state
-                entity_id: !input schedule
-                state: "off"
-            then:
-              - service: climate.turn_off
-                target:
-                  entity_id: !input thermostat
-          - if: #person at home, schedule on
-              - condition: zone
-                entity_id: !input person
-                zone: !input zone
-              - condition: state
-                entity_id: !input schedule
-                state: "on"
-            then:
-              - service: climate.set_temperature
-                target:
-                  entity_id: !input thermostat
-                data:
-                  temperature: "{{ states[comfort_temperature].state | float }}"
-                  hvac_mode: heat
-          - if: #person not at home, but home occupied, schedule on
-              - condition: not
-                conditions:
-                  - condition: zone
-                    entity_id: !input person
-                    zone: !input zone
-              - condition: template
-                value_template: "{{ zone_occupation == 'on' }}"
-              - condition: state
-                entity_id: !input schedule
-                state: "on"
-            then:
-              - service: climate.set_temperature
-                target:
-                  entity_id: !input thermostat
-                data:
-                  temperature: "{{ states[comfort_temperature].state | float }}"
-                  hvac_mode: heat
-          - if: #person not at home, home not occupied, schedule on
-              - condition: not
-                conditions:
-                  - condition: zone
-                    entity_id: !input person
-                    zone: !input zone
-              - condition: template
-                value_template: "{{ zone_occupation == 'off' }}"
-              - condition: state
-                entity_id: !input schedule
-                state: "on"
-            then:
-              - service: climate.set_temperature
-                target:
-                  entity_id: !input thermostat
-                data:
-                  temperature: "{{ states[away_temperature].state | float }}"
-                  hvac_mode: heat
-      - conditions: #[8]central on trigger
-          - condition: trigger
-            id: central-on
-        sequence:
-          - choose:
-              - conditions: #schedule off
-                  - condition: state
-                    entity_id: !input schedule
-                    state: "off"
-                sequence:
-                  - service: climate.turn_off
-                    target:
-                      entity_id: !input thermostat
-              - conditions: #schedule on, person at home
-                  - condition: state
-                    entity_id: !input schedule
-                    state: "on"
-                  - condition: zone
-                    entity_id: !input person
-                    zone: !input zone
-                sequence:
-                  - service: climate.set_temperature
-                    target:
-                      entity_id: !input thermostat
-                    data:
-                      temperature: "{{ states[comfort_temperature].state | float }}"
-                      hvac_mode: heat
-              - conditions: #schedule on,person not at home, but home occupied
-                  - condition: state
-                    entity_id: !input schedule
-                    state: "on"
-                  - condition: not
-                    conditions:
-                      - condition: zone
-                        entity_id: !input person
-                        zone: !input zone
-                  - condition: template
-                    value_template: "{{ zone_occupation == 'on' }}"
-                sequence:
-                  - service: climate.set_temperature
-                    target:
-                      entity_id: !input thermostat
-                    data:
-                      temperature: "{{ states[comfort_temperature].state | float }}"
-                      hvac_mode: heat
-              - conditions: #schedule on, person not at home, home not occupied
-                  - condition: state
-                    entity_id: !input schedule
-                    state: "on"
-                  - condition: not
-                    conditions:
-                      - condition: zone
-                        entity_id: !input person
-                        zone: !input zone
-                  - condition: template
-                    value_template: "{{ zone_occupation == 'off' }}"
-                sequence:
-                  - service: climate.set_temperature
-                    target:
-                      entity_id: !input thermostat
-                    data:
-                      temperature: "{{ states[away_temperature].state | float }}"
-                      hvac_mode: heat
-      - conditions:
+          - service: climate.turn_off
+            target:
+              entity_id: !input thermostat
+      - conditions: #[8] homeassistant started
           - condition: trigger
             id: hat-start
         sequence:
           - delay:
               seconds: 30
           - service: automation.reload
+    default: #[9] default
+      - if: #schedule off
+          - condition: state
+            entity_id: !input schedule
+            state: "off"
+        then:
+          - service: climate.turn_off
+            target:
+              entity_id: !input thermostat
+      - if: #person at home, schedule on
+          - condition: zone
+            entity_id: !input person
+            zone: !input zone
+          - condition: state
+            entity_id: !input schedule
+            state: "on"
+        then:
+          - service: climate.set_temperature
+            target:
+              entity_id: !input thermostat
+            data:
+              temperature: "{{ states[comfort_temperature].state | float }}"
+              hvac_mode: heat
+      - if: #person not at home, but home occupied, schedule on
+          - condition: not
+            conditions:
+              - condition: zone
+                entity_id: !input person
+                zone: !input zone
+          - condition: template
+            value_template: "{{ zone_occupation == 'on' }}"
+          - condition: state
+            entity_id: !input schedule
+            state: "on"
+        then:
+          - service: climate.set_temperature
+            target:
+              entity_id: !input thermostat
+            data:
+              temperature: "{{ states[comfort_temperature].state | float }}"
+              hvac_mode: heat
+      - if: #person not at home, home not occupied, schedule on
+          - condition: not
+            conditions:
+              - condition: zone
+                entity_id: !input person
+                zone: !input zone
+          - condition: template
+            value_template: "{{ zone_occupation == 'off' }}"
+          - condition: state
+            entity_id: !input schedule
+            state: "on"
+        then:
+          - service: climate.set_temperature
+            target:
+              entity_id: !input thermostat
+            data:
+              temperature: "{{ states[away_temperature].state | float }}"
+              hvac_mode: heat
