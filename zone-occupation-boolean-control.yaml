@@ -51,11 +51,6 @@ trigger:
     zone: !input zone
     event: leave
     id: leave
-  - platform: state
-    entity_id: !input person
-    from: null
-    to: null
-    id: state-change
 variables:
   person: !input person
   zone: !input zone
@@ -76,15 +71,35 @@ action:
     then:
       - delay:
           seconds: 30
+  -if:
+      - condition: trigger
+        id: leave
+   then:
+     - delay:
+         seconds: 60
   - choose:
       - conditions:
-          - condition: template
-            value_template: "{{ zone_occupation > 0 }}"
+          - condition: trigger
+            id: enter
         sequence:
           - service: input_boolean.turn_on
             target:
               entity_id: !input zome_occupied_boolean
-    default:
-      - service: input_boolean.turn_off
-        target:
-          entity_id: !input zome_occupied_boolean
+      - conditions:
+          - condition: trigger
+            id: leave
+        sequence:
+          - if: 
+              - condition: template
+                value_template: "{{ zone_occupation > 0 }}"
+            then:
+            - service: input_boolean.turn_on
+              target:
+                entity_id: !input zome_occupied_boolean
+          - if: 
+              - condition: template
+                value_template: "{{ zone_occupation == 0 }}"
+            then:
+            - service: input_boolean.turn_off
+              target:
+                entity_id: !input zome_occupied_boolean
