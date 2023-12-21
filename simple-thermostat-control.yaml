@@ -134,14 +134,11 @@ variables:
   zone: !input zone
   on_off: !input on_off
   zone_occupation: "
-    {% if not(zone_occupied == 'none' or zone_occupied == none)%}
-    {% set tmp = zone_occupied %}
-    {% elif(zone_occupied == 'none' or zone_occupied == none) and (is_state_attr(zone, 'persons', person)) %}
-    {% set tmp = 'on' %}
-    {% elif(zone_occupied == 'none' or zone_occupied == none) and not (is_state_attr(zone, 'persons', person)) %}
     {% set tmp = 'off' %}
-    {% else %}
-    {% set tmp = '3' %}
+    {% if zone_occupied != 'none' and zone_occupied != none %}
+    {% set tmp = zone_occupied %}
+    {% elif is_state_attr(zone, 'persons', person) %}
+    {% set tmp = 'on' %}
     {% endif %}
     {{ tmp }}"
 
