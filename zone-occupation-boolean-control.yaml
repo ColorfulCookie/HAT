@@ -24,7 +24,7 @@ blueprint:
             - domain:
                 - zone
           multiple: false
-    zome_occupied_boolean:
+    zone_occupied_boolean:
       name: Input Boolean Occupied
       description:
         An input boolean that should changes its state based on the occupation
@@ -35,10 +35,11 @@ blueprint:
             - domain:
                 - input_boolean
           multiple: false
+  source_url: https://github.com/ColorfulCookie/HAT/blob/main/zone-occupation-boolean-control.yaml
 trigger_variables:
   person: !input person
   zone: !input zone
-  zome_occupied_boolean: !input zome_occupied_boolean
+  zone_occupied_boolean: !input zone_occupied_boolean
 trigger:
   - platform: homeassistant
     event: start
@@ -56,7 +57,8 @@ trigger:
 variables:
   person: !input person
   zone: !input zone
-  zome_occupied_boolean: !input zome_occupied_boolean
+  zone_occupied_boolean: !input zone_occupied_boolean
+  nr_zone_occupants: '{{ (states[zone].state | int ) }}'
 condition:
 action:
   - if:
@@ -78,19 +80,19 @@ action:
         sequence:
           - service: input_boolean.turn_on
             target:
-              entity_id: !input zome_occupied_boolean
+              entity_id: !input zone_occupied_boolean
     default:
       - if:
           - condition: template
-            value_template: "{{ states[zone].state > 0 }}"
+            value_template: "{{ nr_zone_occupants > 0 }}"
         then:
           - service: input_boolean.turn_on
             target:
-              entity_id: !input zome_occupied_boolean
+              entity_id: !input zone_occupied_boolean
       - if:
           - condition: template
-            value_template: "{{ states[zone].state < 1 }}"
+            value_template: "{{ nr_zone_occupants < 1 }}"
         then:
           - service: input_boolean.turn_off
             target:
-              entity_id: !input zome_occupied_boolean
+              entity_id: !input zone_occupied_boolean
