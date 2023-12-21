@@ -147,8 +147,12 @@ variables:
 
 condition:
 action:
-  - delay:
-      seconds: 30
+  - if:
+      - condition: trigger
+        id: hat-start
+    then:
+      - delay:
+          seconds: 30
   - variables:
       comfort_temperature: !input comfort_temperature
       away_temperature: !input away_temperature
