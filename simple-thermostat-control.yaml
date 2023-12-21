@@ -133,15 +133,19 @@ variables:
   zone_occupied: !input zone_occupied
   zone: !input zone
   on_off: !input on_off
-  zone_occupation: "
-    {% set tmp = 'off' %}
+  zone_occupation: "{% set tmp = 'off' %}
     {% if zone_occupied != 'none' and zone_occupied != none %}
     {% set tmp = zone_occupied %}
-    {% elif is_state_attr(zone, 'persons', person) %}
+    {% else %}
+    {% for p in person %}
+    {% if p in state_attr(zone, 'persons') %}
     {% set tmp = 'on' %}
+    {% break %}
+    {% endif %}
+    {% endfor %}
     {% endif %}
     {{ tmp }}"
-
+    
 condition:
 action:
   - if:
